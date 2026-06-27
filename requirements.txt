@@ -1,0 +1,19 @@
+# ─── Laraflask Core (install from PyPI) ──────────────────────────────────────
+# pip install laraflask-core
+# or with extras:
+# pip install laraflask-core[all]
+
+laraflask-core>=1.0.0
+
+# ─── Add only what your app actually uses ─────────────────────────────────────
+# laraflask-core[mysql]          MySQL support
+# laraflask-core[postgresql]     PostgreSQL support
+# laraflask-core[redis]          Redis cache/queue
+# laraflask-core[auth]           bcrypt + JWT
+# laraflask-core[queue]          Celery
+# laraflask-core[storage]        S3 / boto3
+# laraflask-core[notifications]  Twilio SMS
+# laraflask-core[websocket]      SocketIO
+# laraflask-core[testing]        pytest helpers
+# laraflask-core[dev]            Full dev toolchain
+# laraflask-core[production]     Gunicorn + Gevent
