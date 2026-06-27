@@ -3,7 +3,7 @@
 # or with extras:
 # pip install laraflask-core[all]
 
-laraflask-core>=1.0.0
+laraflask-core
 
 # ─── Add only what your app actually uses ─────────────────────────────────────
 # laraflask-core[mysql]          MySQL support
