@@ -1,4 +1,4 @@
-# Laraflask
+# Laraflask v1.4.0
 
 **A Laravel-inspired framework for Python — built on top of Flask + SQLAlchemy.**
 Elegant. Expressive. Modern.
@@ -37,6 +37,7 @@ class PostController(Controller):
   - [Query Builder](#query-builder)
   - [Collection](#collection)
   - [Relationships](#relationships)
+  - [Model Observers](#model-observers)
   - [Migrations & Schema](#migrations--schema)
   - [Vector Similarity Search (pgvector)](#vector-similarity-search-pgvector)
 - [Validation (Validator & FormRequest)](#validation-validator--formrequest)
@@ -332,6 +333,10 @@ for report in container.tagged('reports'):
 ### Service Provider
 
 A Service Provider is the central place for **registering** (`register()`) and **booting** (`boot()`) services into the container. All of Laraflask's core features (DB, Cache, Auth, Queue, etc.) are booted through built-in providers; you add your own providers for application logic.
+
+```bash
+python artisan.py make:provider AppServiceProvider
+```
 
 ```python
 # app/Providers/AppServiceProvider.py
@@ -758,6 +763,48 @@ user.profile                # has_one    -> Optional[Profile]
 
 > ⚠️ **Honest note:** `belongs_to_many` (many-to-many relationships through a pivot table) is currently **not implemented** and will raise `NotImplementedError` if called. Use a manual query via `DB` or `RawQueryBuilder` as a temporary workaround.
 
+### Model Observers
+
+Observers separate lifecycle logic (what happens when a model is created, updated, deleted, etc.) from the Model class itself.
+
+```bash
+python artisan.py make:observer PostObserver --model Post
+```
+
+```python
+# app/Observers/PostObserver.py
+from app.Models.Post import Post
+from laraflask.orm.observer import Observer
+
+
+class PostObserver(Observer):
+    def created(self, model: Post) -> None:
+        send_new_post_notification(model)
+
+    def updated(self, model: Post) -> None:
+        clear_post_cache(model.id)
+
+    def deleted(self, model: Post) -> None:
+        cleanup_post_assets(model)
+```
+
+```python
+# Register it (e.g. in a ServiceProvider.boot())
+Post.observe(PostObserver)
+```
+
+**Available hooks:** `creating`, `created`, `updating`, `updated`, `deleting`, `deleted`, `saving`, `saved`, `restoring`, `restored`.
+
+> ⚠️ **Honest note:** `Model.observe()` wires an Observer's hooks to the existing `ModelCreating`/`ModelCreated`/etc. events in `laraflask.events.dispatcher`, but those events are **still not automatically dispatched** from `Model.save()`/`delete()`. For now, you need to dispatch them manually for the observer to fire:
+> ```python
+> from laraflask.events.dispatcher import Events, ModelCreating, ModelCreated
+>
+> post = Post(title='Hello')
+> Events.dispatch(ModelCreating(post))
+> post.save()
+> Events.dispatch(ModelCreated(post))   # PostObserver.created() fires here
+> ```
+
 ### Collection
 
 `QueryBuilder.get()` and `Model.all()` still return a plain Python `list` by default (backward compatible). Pass `as_collection=True` to get results back as a chainable `Collection` — inspired by `Illuminate\Support\Collection`.
@@ -960,6 +1007,38 @@ Validator.extend('phone_id', lambda field, value, params: (
 Validator(data, {'phone': 'required|phone_id'})
 ```
 
+For a more organized, reusable rule, generate a class that wraps this same `Validator.extend()` pattern:
+
+```bash
+python artisan.py make:rule PhoneIdRule
+```
+
+```python
+# app/Rules/PhoneIdRule.py
+from laraflask.validation.validator import Validator
+
+
+class PhoneIdRule:
+    rule_name = 'phone_id_rule'
+
+    @classmethod
+    def register(cls) -> None:
+        Validator.extend(cls.rule_name, cls.validate)
+
+    @staticmethod
+    def validate(field: str, value, params) -> tuple:
+        passed = bool(re.match(r'^08\d{8,11}$', str(value)))
+        return passed, f"The {field} field must be a valid Indonesian phone number."
+```
+
+```python
+# Register once, e.g. in a ServiceProvider.boot()
+PhoneIdRule.register()
+
+# Then use it like any other rule
+Validator(data, {'phone': 'required|phone_id_rule'})
+```
+
 ### Conditional Rules & After Hook
 
 ```python
@@ -968,6 +1047,10 @@ validator.after(lambda v: v._errors.setdefault('custom', []).append('Additional 
 ```
 
 ### FormRequest
+
+```bash
+python artisan.py make:request StorePostRequest
+```
 
 ```python
 # app/Requests/StorePostRequest.py
@@ -1113,6 +1196,10 @@ Gate.after(lambda user, ability, result: log_authorization(user, ability, result
 ```
 
 ### Policy — Per-Model Authorization
+
+```bash
+python artisan.py make:policy PostPolicy --model Post
+```
 
 ```python
 # app/Policies/PostPolicy.py
@@ -1776,15 +1863,20 @@ ApiResponse.paginated(items, total=100, per_page=15, page=1)
 
 ### ApiResource — Simple Transformer
 
+```bash
+python artisan.py make:resource PostResource
+```
+
 ```python
 from laraflask.api.api import ApiResource
 
 class PostResource(ApiResource):
     def to_array(self) -> dict:
+        # self._resource holds the model/object passed into the constructor.
         return {
-            'id': self.model.id,
-            'title': self.model.title,
-            'author': self.model.author.name,
+            'id': self._resource.id,
+            'title': self._resource.title,
+            'author': self._resource.author.name,
         }
 
 PostResource(post).to_response()
@@ -1794,6 +1886,10 @@ PostResource.collection(posts).to_response()
 ### JsonApiResource — [JSON:API](https://jsonapi.org/format/) Specification
 
 For APIs that follow the full JSON:API standard: the `{data, included, links, meta}` structure, sparse fieldsets, and relationship inclusion.
+
+```bash
+python artisan.py make:resource PostResource --jsonapi
+```
 
 ```python
 from laraflask.api.jsonapi import JsonApiResource
@@ -2035,13 +2131,70 @@ self.assert_database_count('posts', 5)
 self.refresh_database()   # reset the database to a clean state
 ```
 
-### Model Factories
+### Database Seeders & Factories
+
+**Seeder** — populate the database with initial/sample data:
+
+```bash
+python artisan.py make:seeder PostSeeder
+```
 
 ```python
-# database/factories/PostFactory.py — define default attributes (backed by Faker)
-post = self.create(Post, title='Custom Title')   # persists to the DB
-post = self.make(Post, title='Custom Title')      # builds an instance without saving
+# database/seeders/PostSeeder.py
+from laraflask.orm.seeder import Seeder
+from database.factories.PostFactory import PostFactory
+
+
+class PostSeeder(Seeder):
+    def run(self) -> None:
+        PostFactory().count(20).create()
 ```
+
+Run it via `python artisan.py db:seed`. A main `DatabaseSeeder` can call several seeders in sequence with `self.call(...)`:
+
+```python
+class DatabaseSeeder(Seeder):
+    def run(self) -> None:
+        self.call(UserSeeder, PostSeeder, CommentSeeder)
+```
+
+**Factory** — generate dummy model instances, backed by [Faker](https://faker.readthedocs.io/) (`pip install laraflask-core[testing]`):
+
+```bash
+python artisan.py make:factory PostFactory --model Post
+```
+
+```python
+# database/factories/PostFactory.py
+from laraflask.orm.factory import Factory
+from app.Models.Post import Post
+
+
+class PostFactory(Factory):
+    model = Post
+
+    def definition(self) -> dict:
+        return {
+            'title': self.faker.sentence(),
+            'body': self.faker.paragraph(),
+        }
+```
+
+| Method | Description |
+|---|---|
+| `.make()` | Build an instance **without** persisting it |
+| `.create()` | Build an instance **and** save it to the database |
+| `.count(n)` | Produce `n` instances instead of 1 (returns a list) |
+| `.state(**overrides)` | Override specific attributes from `definition()`, chainable |
+
+```python
+post = PostFactory().make()                              # instance only, not saved
+post = PostFactory().create()                              # instance + saved to DB
+posts = PostFactory().count(10).create()                   # 10 saved instances
+post = PostFactory().state(title='Pinned Post').create()   # override one field
+```
+
+> 💡 In test classes that inherit `UnitTestCase`/`FeatureTestCase`, `self.create(Model, **attrs)` / `self.make(Model, **attrs)` remain available as convenience shortcuts on top of any registered factory.
 
 ### Fakes (Isolating Side Effects)
 
@@ -2084,8 +2237,27 @@ Every command is run via `python artisan.py <command>` from the project root.
 | `make:event EventName` | Create a new Event class |
 | `make:listener ListenerName` | Create a new Listener class |
 | `make:notification NotificationName` | Create a new Notification class |
+| `make:request RequestName` | Create a new FormRequest class in `app/Requests` |
+| `make:policy PolicyName [--model ModelName]` | Create a new Policy class in `app/Policies`; with `--model`, the standard methods (`view_any`, `view`, `create`, `update`, `delete`, `restore`, `force_delete`) are type-hinted against that model |
+| `make:resource ResourceName [--jsonapi]` | Create a new API resource class in `app/Resources`; defaults to `ApiResource`, or `JsonApiResource` with `--jsonapi` |
+| `make:rule RuleName` | Create a new custom validation rule in `app/Rules`, ready to register via `RuleName.register()` |
+| `make:provider ProviderName` | Create a new ServiceProvider class in `app/Providers` |
+| `make:seeder SeederName` | Create a new database seeder in `database/seeders` |
+| `make:factory FactoryName [--model ModelName]` | Create a new model factory in `database/factories`, wired to Faker |
+| `make:observer ObserverName [--model ModelName]` | Create a new model observer in `app/Observers` |
+| `make:command CommandName [--command-name name]` | Create a new custom Artisan command in `app/Console` |
 
-> ⚠️ **Honest note:** `make:request`, `make:policy`, `make:resource`, `make:rule`, `make:provider`, `make:seeder`, `make:factory`, `make:observer`, and `make:command` are **not yet implemented** in the Artisan CLI — files for those classes (`FormRequest`, `Policy`, etc.) currently need to be created manually, following the examples in this documentation.
+```bash
+python artisan.py make:request StorePostRequest
+python artisan.py make:policy PostPolicy --model Post
+python artisan.py make:resource PostResource --jsonapi
+python artisan.py make:rule PhoneIdRule
+python artisan.py make:provider PaymentServiceProvider
+python artisan.py make:seeder PostSeeder
+python artisan.py make:factory PostFactory --model Post
+python artisan.py make:observer PostObserver --model Post
+python artisan.py make:command SendDigestCommand --command-name digest:send
+```
 
 ### Database
 
@@ -2295,6 +2467,19 @@ gunicorn -w 4 -k gevent -b 0.0.0.0:8000 laraflask:flask_app
 
 ## Changelog
 
+### v1.4.0 (latest)
+
+| # | Area | File(s) | Change |
+|---|---|---|---|
+| 1 | Artisan generators | `console/artisan.py` | Implemented `make:request`, `make:policy`, `make:resource`, `make:rule`, `make:provider`, `make:seeder`, `make:factory`, `make:observer`, `make:command` — previously documented as not yet implemented. |
+| 2 | `make:policy` / `make:observer` / `make:factory` | `console/artisan.py` | Accept `--model` to generate methods type-hinted against a specific model. |
+| 3 | `make:resource` | `console/artisan.py` | Accepts `--jsonapi` to scaffold a `JsonApiResource` instead of the default `ApiResource`. |
+| 4 | `Seeder` (new) | `orm/seeder.py` | Base class for database seeders, with `call()` to compose multiple seeders. |
+| 5 | `Factory` (new) | `orm/factory.py` | Faker-backed base class for model factories: `make()`, `create()`, `count()`, `state()`. |
+| 6 | `Observer` (new) | `orm/observer.py` | Base class for model observers with the standard lifecycle hooks. |
+| 7 | `Model.observe()` | `orm/model.py` | Wires an `Observer`'s hooks to the existing `ModelCreating`/`ModelCreated`/etc. events. Those events are still not auto-dispatched from `save()`/`delete()` — see [Model Observers](#model-observers). |
+| 8 | Documentation | `README.md` | Added "Model Observers" and "Database Seeders & Factories" sections; updated the Artisan CLI command table; updated "Known Limitations". |
+
 ### v1.3.0 (latest)
 
 | # | Area | File(s) | Change |
@@ -2349,11 +2534,9 @@ gunicorn -w 4 -k gevent -b 0.0.0.0:8000 laraflask:flask_app
 This section is documented honestly so it doesn't create false expectations:
 
 - **`belongs_to_many`** (many-to-many relationships through a pivot table) is not implemented — calling it raises `NotImplementedError`.
-- **Model lifecycle events** (`ModelCreating`, `ModelCreated`, `ModelUpdating`, etc.) are already defined as Event classes, but are **not yet automatically dispatched** from `Model.save()`/`delete()`. They need to be dispatched manually if needed.
-- **The Model Observer pattern** (`class UserObserver(Observer): def created(self, user): ...` followed by `User.observe(UserObserver)`) is **not implemented**.
+- **Model lifecycle events** (`ModelCreating`, `ModelCreated`, `ModelUpdating`, etc.) are already defined as Event classes, and `Model.observe()` can wire an `Observer`'s hooks to them — but the events themselves are **still not automatically dispatched** from `Model.save()`/`delete()`. They need to be dispatched manually for an Observer to actually fire; see [Model Observers](#model-observers) for the workaround.
 - **Job chaining & batching** (`Bus.chain([...]).dispatch()`, `Bus.batch([...]).then().catch()`) are **not implemented**.
 - **Sanctum-style API Token Auth** (`PersonalAccessToken`, `HasApiTokens`, a `TokenGuard` based on the `Authorization: Bearer` header) is **not implemented**. For stateless API authentication today, use the JWT Guard instead (see [Authentication](#authentication-auth)).
-- **The following Artisan generator commands don't exist yet**: `make:request`, `make:policy`, `make:resource`, `make:rule`, `make:provider`, `make:seeder`, `make:factory`, `make:observer`, `make:command`. Create these files manually, following the code examples in this documentation.
 - **`Hash`/`Crypt` fallback behavior**: without `bcrypt`/`cryptography` installed, both fall back to a simpler implementation (salted SHA-256 / XOR) that is **not safe for production**. Always install `pip install laraflask-core[auth]` in production environments.
 - **HTTP status 419** (CSRF token mismatch) is used by `CsrfMiddleware`/`PreventRequestForgeryMiddleware` via `abort(419)`, but 419 isn't a standard HTTP code in Werkzeug — register a custom exception handler for this code at your application level if you don't already have one, or handle it via `app.errorhandler`.
 
