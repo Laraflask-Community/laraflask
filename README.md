@@ -1,4 +1,4 @@
-# Laraflask v1.3.0
+# Laraflask
 
 **A Laravel-inspired framework for Python — built on top of Flask + SQLAlchemy.**
 Elegant. Expressive. Modern.
@@ -118,10 +118,6 @@ Laraflask uses *extras* to keep dependencies lightweight — install only what y
 ## Creating a New Project
 
 ```bash
-# Scaffold a new project
-laraflask new my-app
-cd my-app
-
 # Copy the environment file
 cp .env.example .env
 
