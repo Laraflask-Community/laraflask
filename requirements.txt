@@ -5,7 +5,7 @@
 # laraflask-core pins its own transitive dependencies.
 # Only add packages here that your APPLICATION needs directly.
 
-laraflask-core>=1.3.0
+laraflask-core
 
 # ─── Add only the extras your app actually uses ───────────────────────────────
 # laraflask-core[mysql]            MySQL driver (PyMySQL)
