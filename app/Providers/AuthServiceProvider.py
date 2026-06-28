@@ -11,7 +11,7 @@ class AuthServiceProvider(ServiceProvider):
     Register authentication / authorization services.
     """
 
-    # Map models to policy classes
+    # Map model class paths → policy class paths
     policies = {
         # 'app.Models.Post.Post': 'app.Policies.PostPolicy.PostPolicy',
     }

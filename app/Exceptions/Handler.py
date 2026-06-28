@@ -8,8 +8,6 @@ import logging
 import traceback
 from typing import TYPE_CHECKING
 
-from flask import jsonify, request, render_template_string
-
 if TYPE_CHECKING:
     from laraflask.core.application import Application
 
@@ -74,6 +72,7 @@ class Handler:
 
     def _handle_exception(self, e: Exception):
         """Handle any unhandled exception."""
+        from flask import jsonify, request, redirect, url_for
         from laraflask.core.exceptions import (
             ModelNotFoundException, AuthorizationException,
             AuthenticationException, ValidationException, HttpException,
@@ -88,7 +87,6 @@ class Handler:
         if isinstance(e, AuthenticationException):
             if request.is_json or request.path.startswith('/api/'):
                 return jsonify({'message': 'Unauthenticated.'}), 401
-            from flask import redirect, url_for
             try:
                 return redirect(url_for('login'))
             except Exception:
@@ -98,7 +96,7 @@ class Handler:
             return jsonify({
                 'success': False,
                 'message': 'Validation failed.',
-                'errors': e.errors,
+                'errors':  e.errors,
             }), 422
 
         if isinstance(e, HttpException):
@@ -122,6 +120,7 @@ class Handler:
         )
 
     def _debug_response(self, e: Exception):
+        from flask import jsonify, request, Response
         tb = traceback.format_exc()
         if request.is_json or request.path.startswith('/api/'):
             return jsonify({
@@ -152,12 +151,13 @@ class Handler:
   </div>
 </body>
 </html>"""
-        from flask import Response
         return Response(html, status=500, mimetype='text/html')
 
     def _json_or_html(self, data: dict, status: int):
-        if request.is_json or request.path.startswith('/api/') or \
-           'application/json' in request.headers.get('Accept', ''):
+        from flask import jsonify, request
+        if (request.is_json
+                or request.path.startswith('/api/')
+                or 'application/json' in request.headers.get('Accept', '')):
             return jsonify({'success': False, **data}), status
         return jsonify({'success': False, **data}), status
 

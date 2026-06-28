@@ -1,20 +1,21 @@
 """
 Web Routes — Laraflask
 Define stateful, session-based web routes here.
+
+`Route` is injected automatically by the framework — do NOT import Flask
+or laraflask.routing.router here. Use `Route` directly for all routing,
+and `ApiResponse` (or `self.respond()` inside controllers) for responses.
 """
 
-from flask import render_template, redirect, url_for, session, jsonify
-
-# Route is injected automatically by the framework
-# from laraflask.routing.router import Router as Route
+from laraflask.api.api import ApiResponse
 
 # ─── Welcome ──────────────────────────────────────────────────────────────────
 
-Route.get('/', lambda: jsonify({
+Route.get('/', lambda: ApiResponse.success(data={
     'framework': 'Laraflask',
-    'version': '1.0.0',
-    'tagline': 'Elegant · Expressive · Modern · Fast · Scalable',
-    'status': 'running',
+    'version':   '1.3.0',
+    'tagline':   'Elegant · Expressive · Modern · Fast · Scalable',
+    'status':    'running',
 })).name('welcome')
 
 

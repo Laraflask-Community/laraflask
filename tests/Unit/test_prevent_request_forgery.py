@@ -3,13 +3,17 @@ Unit Test: PreventRequestForgery
 Tests the origin-aware CSRF protection layer on top of token-based
 verification, plus the opt-in PreventRequestForgeryMiddleware, while
 confirming the original CsrfMiddleware remains untouched.
+
+Note: Flask is imported here only to create isolated test_request_context
+      instances. Route files and controllers must NOT import Flask at the
+      top level — only unit tests that need a bare request context may use
+      the _make_flask_app() helper pattern below.
 """
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import unittest
-from flask import Flask
 from werkzeug.exceptions import HTTPException
 from laraflask.testing.test_case import UnitTestCase
 from laraflask.security.security import PreventRequestForgery, CsrfToken
@@ -29,6 +33,19 @@ class FakeRequest:
             headers['Referer'] = referer
         self.headers = headers
         self.host = host
+
+
+def _make_flask_app():
+    """
+    Create a minimal Flask app for test_request_context only.
+    Unit tests that need a request context use this helper instead of
+    importing Flask at module level.
+    """
+    from flask import Flask
+    app = Flask(__name__)
+    app.secret_key = 'test-secret'
+    app.config['TESTING'] = True
+    return app
 
 
 class PreventRequestForgeryTokenLayerTest(UnitTestCase):
@@ -107,8 +124,7 @@ class PreventRequestForgeryMiddlewareTest(UnitTestCase):
     """Confirm the new middleware works and the old CsrfMiddleware is untouched."""
 
     def before_each(self):
-        self.app = Flask(__name__)
-        self.app.secret_key = 'test-secret'
+        self.app = _make_flask_app()
 
     def test_old_csrf_middleware_class_unchanged(self):
         # Sanity check: the original middleware still exists with its original behavior contract.

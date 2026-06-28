@@ -2,6 +2,7 @@
 User Model
 """
 
+import laraflask
 from laraflask.orm.model import Model
 from laraflask.auth.auth import Hash
 from laraflask.notifications.notification import Notifiable
@@ -12,13 +13,13 @@ class User(Model, Notifiable):
     User model — the default authentication model.
     """
 
-    __table__ = 'users'
+    __table__    = 'users'
     __fillable__ = ['name', 'email', 'password']
-    __hidden__ = ['password', 'remember_token']
-    __casts__ = {
+    __hidden__   = ['password', 'remember_token']
+    __casts__    = {
         'email_verified_at': 'datetime',
-        'created_at': 'datetime',
-        'updated_at': 'datetime',
+        'created_at':        'datetime',
+        'updated_at':        'datetime',
     }
 
     # ─── Mutators ─────────────────────────────────────────────────────────────

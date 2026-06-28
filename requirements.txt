@@ -1,19 +1,22 @@
-# ─── Laraflask Core (install from PyPI) ──────────────────────────────────────
-# pip install laraflask-core
-# or with extras:
-# pip install laraflask-core[all]
+# ─── Laraflask Core ───────────────────────────────────────────────────────────
+# Install from PyPI:  pip install laraflask-core
+# With all features:  pip install laraflask-core[all]
+#
+# laraflask-core pins its own transitive dependencies.
+# Only add packages here that your APPLICATION needs directly.
 
-laraflask-core
+laraflask-core>=1.3.0
 
-# ─── Add only what your app actually uses ─────────────────────────────────────
-# laraflask-core[mysql]          MySQL support
-# laraflask-core[postgresql]     PostgreSQL support
-# laraflask-core[redis]          Redis cache/queue
-# laraflask-core[auth]           bcrypt + JWT
-# laraflask-core[queue]          Celery
-# laraflask-core[storage]        S3 / boto3
-# laraflask-core[notifications]  Twilio SMS
-# laraflask-core[websocket]      SocketIO
-# laraflask-core[testing]        pytest helpers
-# laraflask-core[dev]            Full dev toolchain
-# laraflask-core[production]     Gunicorn + Gevent
+# ─── Add only the extras your app actually uses ───────────────────────────────
+# laraflask-core[mysql]            MySQL driver (PyMySQL)
+# laraflask-core[postgresql]       PostgreSQL driver (psycopg2)
+# laraflask-core[vector]           pgvector — semantic / similarity search
+# laraflask-core[redis]            Redis cache & queue
+# laraflask-core[auth]             bcrypt + PyJWT + cryptography
+# laraflask-core[queue]            Celery + Kombu
+# laraflask-core[storage]          Amazon S3 / MinIO / R2 (boto3)
+# laraflask-core[notifications]    Twilio (SMS / WhatsApp)
+# laraflask-core[websocket]        Flask-SocketIO
+# laraflask-core[testing]          pytest + factory-boy + faker
+# laraflask-core[dev]              Full dev toolchain
+# laraflask-core[production]       Gunicorn + Gevent

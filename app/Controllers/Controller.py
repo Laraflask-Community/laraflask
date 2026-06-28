@@ -5,7 +5,6 @@ All application controllers extend this class.
 
 from __future__ import annotations
 from typing import Any, Dict, List, Optional, Type
-from flask import jsonify, render_template, redirect, url_for, request, session, abort
 
 
 class Controller:
@@ -18,6 +17,7 @@ class Controller:
 
     def view(self, template: str, data: Dict = None) -> str:
         """Render a BladePy / Jinja2 template."""
+        from flask import render_template
         return render_template(
             template.replace('.', '/') + '.blade.html',
             **(data or {})
@@ -25,24 +25,22 @@ class Controller:
 
     def json(self, data: Any = None, status: int = 200) -> Any:
         """Return a JSON response."""
+        from flask import jsonify
         return jsonify(data), status
 
     def respond(self, data: Any = None, message: str = 'OK', status: int = 200) -> Any:
         """Standardised API success response."""
-        payload = {'success': True, 'message': message}
-        if data is not None:
-            payload['data'] = data
-        return jsonify(payload), status
+        from laraflask.api.api import ApiResponse
+        return ApiResponse.success(data=data, message=message), status
 
     def error(self, message: str = 'Error', status: int = 400,
               errors: Dict = None) -> Any:
         """Standardised API error response."""
-        payload = {'success': False, 'message': message}
-        if errors:
-            payload['errors'] = errors
-        return jsonify(payload), status
+        from laraflask.api.api import ApiResponse
+        return ApiResponse.error(message=message, errors=errors or {}), status
 
-    def no_content(self):
+    def no_content(self) -> Any:
+        """Return 204 No Content response."""
         from flask import Response
         return Response(status=204)
 
@@ -50,24 +48,30 @@ class Controller:
 
     def back(self, fallback: str = '/') -> Any:
         """Redirect back to the previous URL."""
+        from flask import redirect, url_for, request
         back_url = request.referrer or url_for(fallback)
         return redirect(back_url)
 
     def redirect_to(self, url: str, status: int = 302) -> Any:
+        from flask import redirect
         return redirect(url, status)
 
     def redirect_route(self, name: str, status: int = 302, **kwargs) -> Any:
+        from flask import redirect, url_for
         return redirect(url_for(name, **kwargs), status)
 
     def redirect_with_success(self, url: str, message: str) -> Any:
+        from flask import redirect, session
         session['success'] = message
         return redirect(url)
 
     def redirect_with_error(self, url: str, message: str) -> Any:
+        from flask import redirect, session
         session['error'] = message
         return redirect(url)
 
     def redirect_back_with_errors(self, errors: Dict, input: Dict = None) -> Any:
+        from flask import session
         session['errors'] = errors
         if input:
             session['_old_input'] = input
@@ -78,6 +82,7 @@ class Controller:
     def validate(self, data: Dict, rules: Dict,
                  messages: Dict = None) -> Dict:
         """Validate data and return validated fields, or abort 422."""
+        from flask import request, abort
         from laraflask.validation.validator import Validator, ValidationException
         try:
             return Validator(data, rules, messages).validate()
@@ -89,6 +94,7 @@ class Controller:
 
     def validate_request(self, rules: Dict, messages: Dict = None) -> Dict:
         """Validate the current request."""
+        from flask import request
         data = {
             **request.form.to_dict(),
             **request.args.to_dict(),
@@ -100,6 +106,7 @@ class Controller:
 
     def input(self, key: str, default: Any = None) -> Any:
         """Get a request input value."""
+        from flask import request
         return (request.form.get(key)
                 or request.args.get(key)
                 or (request.get_json(silent=True) or {}).get(key)
@@ -107,6 +114,7 @@ class Controller:
 
     def all_input(self) -> Dict:
         """Get all request input."""
+        from flask import request
         data = {}
         data.update(request.args.to_dict())
         data.update(request.form.to_dict())
@@ -144,6 +152,7 @@ class Controller:
 
     def paginate(self, query_builder, per_page: int = 15,
                  resource_class=None) -> Any:
+        from flask import request, jsonify
         page = request.args.get('page', 1, type=int)
         paginator = query_builder.paginate(per_page=per_page, page=page)
 

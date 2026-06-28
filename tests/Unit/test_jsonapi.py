@@ -2,13 +2,16 @@
 Unit Test: JSON:API Resource
 Tests the JsonApiResource transformer against the JSON:API spec structure:
 {data, included, links, meta}, sparse fieldsets, and relationship inclusion.
+
+Note: Flask is imported here only to create an isolated test_request_context.
+      Route files and controllers must NOT import Flask directly — only tests
+      that need a bare request context may do so via the pattern below.
 """
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import unittest
-from flask import Flask
 from laraflask.testing.test_case import UnitTestCase
 from laraflask.api.jsonapi import JsonApiResource, JsonApiResourceCollection
 
@@ -64,12 +67,26 @@ class UserResource(JsonApiResource):
         return UserResource
 
 
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _make_flask_app():
+    """
+    Create a minimal Flask app for test_request_context only.
+    Unit tests that need a request context use this helper instead of
+    importing Flask at module level.
+    """
+    from flask import Flask
+    app = Flask(__name__)
+    app.config['TESTING'] = True
+    return app
+
+
 # ─── Tests ────────────────────────────────────────────────────────────────────
 
 class JsonApiResourceBasicsTest(UnitTestCase):
 
     def before_each(self):
-        self.app = Flask(__name__)
+        self.app = _make_flask_app()
 
     def test_to_array_has_type_id_attributes(self):
         with self.app.test_request_context('/'):
@@ -96,7 +113,7 @@ class JsonApiResourceBasicsTest(UnitTestCase):
 class JsonApiRelationshipsTest(UnitTestCase):
 
     def before_each(self):
-        self.app = Flask(__name__)
+        self.app = _make_flask_app()
 
     def test_relationship_data_is_resource_identifier(self):
         with self.app.test_request_context('/'):
@@ -125,7 +142,7 @@ class JsonApiRelationshipsTest(UnitTestCase):
 class JsonApiIncludeTest(UnitTestCase):
 
     def before_each(self):
-        self.app = Flask(__name__)
+        self.app = _make_flask_app()
 
     def test_include_populates_registry(self):
         with self.app.test_request_context('/?include=posts'):
@@ -161,7 +178,7 @@ class JsonApiIncludeTest(UnitTestCase):
 class JsonApiSparseFieldsetTest(UnitTestCase):
 
     def before_each(self):
-        self.app = Flask(__name__)
+        self.app = _make_flask_app()
 
     def test_sparse_fieldset_filters_attributes(self):
         with self.app.test_request_context('/?fields[users]=name'):
@@ -185,7 +202,7 @@ class JsonApiSparseFieldsetTest(UnitTestCase):
 class JsonApiResourceCollectionTest(UnitTestCase):
 
     def before_each(self):
-        self.app = Flask(__name__)
+        self.app = _make_flask_app()
 
     def test_collection_to_array_returns_list_of_resource_objects(self):
         with self.app.test_request_context('/'):
@@ -220,7 +237,7 @@ class JsonApiResourceCollectionTest(UnitTestCase):
 class JsonApiResponseStructureTest(UnitTestCase):
 
     def before_each(self):
-        self.app = Flask(__name__)
+        self.app = _make_flask_app()
 
     def test_response_includes_meta_and_links_when_provided(self):
         with self.app.test_request_context('/'):

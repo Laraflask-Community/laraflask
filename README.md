@@ -1,4 +1,4 @@
-# Laraflask
+# Laraflask v1.3.0
 
 **A Laravel-inspired framework for Python — built on top of Flask + SQLAlchemy.**
 Elegant. Expressive. Modern.
@@ -1169,12 +1169,12 @@ Gate.allows('update', post)    # automatically looks up PostPolicy.update()
 ```python
 # app/Middleware/EnsureUserIsAdmin.py
 from laraflask.middleware.middleware import Middleware
-from flask import abort
 
 
 class EnsureUserIsAdmin(Middleware):
     def handle(self, request, next):
         from laraflask.auth.auth import Auth
+        from flask import abort          # abort() is a Werkzeug/Flask helper — use inline only inside handle()
         user = Auth.user()
         if not user or not user.is_admin():
             abort(403)
@@ -1758,11 +1758,10 @@ A Blade-style template engine, compiled down to Jinja2 (so every Jinja2 feature 
 ### Rendering from a Controller
 
 ```python
-from flask import render_template
-
 def show(self, id):
     post = Post.find_or_fail(id)
-    return render_template('posts.show', post=post.to_dict())
+    # Use self.view() from Controller base class (calls render_template internally)
+    return self.view('posts.show', {'post': post.to_dict()})
 ```
 
 ---
@@ -2254,15 +2253,15 @@ from laraflask.core.exceptions import (
 ```python
 # app/Exceptions/Handler.py
 from laraflask.core.exceptions import ModelNotFoundException, ValidationException
-from flask import jsonify
+from laraflask.api.api import ApiResponse
 
 
 class Handler:
     def render(self, request, exception):
         if isinstance(exception, ModelNotFoundException):
-            return jsonify({'message': 'Resource not found'}), 404
+            return ApiResponse.not_found()
         if isinstance(exception, ValidationException):
-            return jsonify({'errors': exception.errors}), 422
+            return ApiResponse.validation_error(exception.errors)
         # ... default fallback
 ```
 
@@ -2300,9 +2299,20 @@ gunicorn -w 4 -k gevent -b 0.0.0.0:8000 laraflask:flask_app
 
 ## Changelog
 
-### v1.2.0 (latest)
+### v1.3.0 (latest)
 
-| # | Feature | File(s) | Description |
+| # | Area | File(s) | Change |
+|---|---|---|---|
+| 1 | **Import hygiene — routes** | `routes/web.py`, `routes/api.py` | Removed stale `from flask import …` top-level imports. `Route` is injected by the framework; responses use `ApiResponse` from core. |
+| 2 | **Import hygiene — Controller** | `app/Controllers/Controller.py` | Moved all `from flask import …` statements from module-level to lazy inline imports inside each method. `respond()` and `error()` now delegate to `ApiResponse` from core for a consistent response envelope. |
+| 3 | **Import hygiene — Handler** | `app/Exceptions/Handler.py` | Removed module-level `from flask import …`. All Flask primitives (`jsonify`, `request`, `redirect`, `Response`) are now imported lazily inside each method where they are used. |
+| 4 | **Import hygiene — Tests** | `tests/Unit/test_jsonapi.py`, `tests/Unit/test_prevent_request_forgery.py` | Removed top-level `from flask import Flask`. Extracted `_make_flask_app()` helper that defers the import to call-time; inline `from flask import request/session` kept inside middleware `with test_request_context` blocks where a live request context is required. |
+| 5 | **Documentation — README** | `README.md` | Fixed three code examples that showed top-level Flask imports in user-space files: middleware example now uses inline `abort()`; template controller example uses `self.view()` from the base `Controller`; Handler example uses `ApiResponse.not_found()` / `ApiResponse.validation_error()`. Version updated to v1.3.0. |
+| 6 | **Dependency versions** | `core/pyproject.toml`, `core/setup.py` | All optional and core dependency pins bumped to latest stable releases as of June 2026. |
+
+### v1.2.0
+
+| # | Area | File(s) | Change |
 |---|---|---|---|
 | 1 | `Cache::touch()` | `cache/cache.py` | Extend a key's TTL without re-fetching its value — a native single round-trip on Redis (`EXPIRE`), metadata-only update on File/Array/Database. |
 | 2 | `Queue::route()` | `queue/queue.py` | Centrally register the default connection/queue per Job class. An explicit instance-level override still wins (backward compatible). |
