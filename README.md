@@ -132,7 +132,7 @@ python artisan.py migrate
 python artisan.py db:seed
 
 # Start the development server
-python laraflask.py
+python server.py
 # or
 python artisan.py serve
 ```
@@ -235,7 +235,7 @@ my-app/
 ├── .env                      — Active environment (never commit this)
 ├── .env.example
 ├── artisan.py                — Artisan CLI entry point
-├── laraflask.py               — Server entry point (`python laraflask.py`)
+├── server.py               — Server entry point (`python server.py`)
 └── conftest.py
 ```
 
