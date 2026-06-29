@@ -7,7 +7,11 @@ Gates provide a closure-based approach to authorization, while policies
 organize authorization logic around a particular model or resource.
 """
 
+import logging
+
 from laraflask.core.providers import ServiceProvider
+
+logger = logging.getLogger(__name__)
 
 
 class AuthServiceProvider(ServiceProvider):
@@ -123,4 +127,9 @@ class AuthServiceProvider(ServiceProvider):
             except (ImportError, AttributeError) as e:
                 # Log the error but do not halt boot; the policy may not
                 # exist yet during development.
-                pass
+                logger.warning(
+                    "Failed to register policy '%s' for model '%s': %s",
+                    policy_path,
+                    model_path,
+                    e,
+                )

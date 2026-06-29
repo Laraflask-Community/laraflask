@@ -21,11 +21,6 @@ class User(Model, Notifiable, HasRoles):
     support from Notifiable.
     """
 
-    # ─── Role Constants ───────────────────────────────────────────────────────
-
-    ROLE_ADMIN: str = 'admin'
-    ROLE_USER: str = 'user'
-
     # ─── Table & Mass-Assignment ──────────────────────────────────────────────
 
     __table__    = 'users'
@@ -86,10 +81,6 @@ class User(Model, Notifiable, HasRoles):
     #     return cls.where('is_active', True)
 
     # ─── Custom Methods ───────────────────────────────────────────────────────
-
-    def is_admin(self) -> bool:
-        """Check whether the user has the admin role."""
-        return self._attributes.get('role') == self.ROLE_ADMIN
 
     def has_verified_email(self) -> bool:
         """Check whether the user has verified their email address."""

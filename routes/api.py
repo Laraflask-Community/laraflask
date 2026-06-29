@@ -57,10 +57,10 @@ def register_resource_routes():
 # =============================================================================
 # Route Registration
 # =============================================================================
-# All API v1 routes are registered under the /api/v1 prefix with the
-# 'throttle:60,1' middleware applied (60 requests per minute per client).
+# All API v1 routes are registered under the /api/v1 prefix.
+# Add middleware (e.g., 'throttle:60,1') to the list below when needed.
 
-with Route.group({'prefix': API_PREFIX, 'middleware': ['throttle:60,1']}):
+with Route.group({'prefix': API_PREFIX, 'middleware': []}):
     register_health_routes()
     register_auth_routes()
     register_resource_routes()
