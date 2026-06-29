@@ -1,33 +1,66 @@
 """
-API Routes — Laraflask
-Define stateless API routes here. JWT / API Key auth recommended.
+API Routes - Laraflask
+======================
 
-`Route` is injected automatically by the framework — do NOT import Flask
-or laraflask.routing.router here. Use `ApiResponse` for all JSON responses.
+Define stateless API routes here. All endpoints return JSON via ApiResponse.
+Authentication should use JWT tokens or API keys (not sessions).
+
+`Route` is injected automatically by the framework at runtime.
+Do NOT import it -- use it directly as a module-level global.
 """
 
 from laraflask.api.api import ApiResponse
 
-# ─── API v1 ───────────────────────────────────────────────────────────────────
 
-def register_v1():
+# =============================================================================
+# Configuration
+# =============================================================================
+
+API_VERSION = 'v1'
+API_PREFIX = f'/api/{API_VERSION}'
+FRAMEWORK_VERSION = '1.3.0'
+
+
+# =============================================================================
+# Route Definitions - API v1
+# =============================================================================
+
+def register_health_routes():
+    """Health check and status endpoints."""
     Route.get('/health', lambda: ApiResponse.success(data={
         'status':    'ok',
-        'version':   'v1',
-        'framework': 'Laraflask 1.3.0',
+        'version':   API_VERSION,
+        'framework': f'Laraflask {FRAMEWORK_VERSION}',
     }))
 
+
+def register_auth_routes():
+    """Authentication endpoints (login, register, token refresh, logout)."""
+    # Route.post('/auth/login',    'App\\Controllers\\Api\\V1\\AuthController@login')
+    # Route.post('/auth/register', 'App\\Controllers\\Api\\V1\\AuthController@register')
+    #
+    # with Route.group({'middleware': ['auth:api']}):
+    #     Route.post('/auth/refresh', 'App\\Controllers\\Api\\V1\\AuthController@refresh')
+    #     Route.post('/auth/logout',  'App\\Controllers\\Api\\V1\\AuthController@logout')
+    pass
+
+
+def register_resource_routes():
+    """RESTful resource endpoints for domain entities."""
     # Route.api_resource('users',    'App\\Controllers\\Api\\V1\\UserController')
     # Route.api_resource('posts',    'App\\Controllers\\Api\\V1\\PostController')
     # Route.api_resource('products', 'App\\Controllers\\Api\\V1\\ProductController')
-
-    # Auth endpoints
-    # Route.post('/auth/login',    'App\\Controllers\\Api\\V1\\AuthController@login')
-    # Route.post('/auth/register', 'App\\Controllers\\Api\\V1\\AuthController@register')
-    # Route.post('/auth/refresh',  'App\\Controllers\\Api\\V1\\AuthController@refresh').middleware('auth:api')
-    # Route.post('/auth/logout',   'App\\Controllers\\Api\\V1\\AuthController@logout').middleware('auth:api')
+    # Route.api_resource('comments', 'App\\Controllers\\Api\\V1\\CommentController')
+    pass
 
 
-# Register under /api/v1 prefix
-with Route.group({'prefix': '/api/v1', 'middleware': []}):
-    register_v1()
+# =============================================================================
+# Route Registration
+# =============================================================================
+# All API v1 routes are registered under the /api/v1 prefix with the
+# 'throttle:60,1' middleware applied (60 requests per minute per client).
+
+with Route.group({'prefix': API_PREFIX, 'middleware': ['throttle:60,1']}):
+    register_health_routes()
+    register_auth_routes()
+    register_resource_routes()
