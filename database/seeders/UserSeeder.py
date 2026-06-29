@@ -2,10 +2,12 @@
 User Seeder — seed the users table with test data.
 """
 
+from laraflask.orm.seeder import Seeder
 from app.Models.User import User
+from database.factories.UserFactory import UserFactory
 
 
-class UserSeeder:
+class UserSeeder(Seeder):
     """Seed the users table."""
 
     def run(self):
@@ -18,21 +20,8 @@ class UserSeeder:
                 'role': 'admin',
             }
         )
-        print("  ✓ Admin user created: admin@laraflask.dev / password")
+        print("  \u2713 Admin user created: admin@laraflask.dev / password")
 
-        # Create test users with Faker
-        try:
-            from faker import Faker
-            fake = Faker()
-
-            for _ in range(10):
-                User.create(
-                    name=fake.name(),
-                    email=fake.unique.email(),
-                    password='password',
-                    role='user',
-                )
-            print(f"  ✓ Created 10 test users")
-
-        except ImportError:
-            print("  ℹ  Install faker for bulk seeding: pip install faker")
+        # Create test users using the factory system
+        UserFactory().times(10).create()
+        print("  \u2713 Created 10 test users")
