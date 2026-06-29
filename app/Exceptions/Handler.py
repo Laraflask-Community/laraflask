@@ -6,7 +6,7 @@ Converts exceptions into appropriate HTTP responses.
 from __future__ import annotations
 import logging
 import traceback
-from typing import TYPE_CHECKING
+from typing import Any, Dict, List, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from laraflask.core.application import Application
@@ -20,13 +20,29 @@ class Handler:
     Register with the Flask app to intercept all unhandled exceptions.
     """
 
-    def __init__(self, app: 'Application'):
+    # ─── Configuration ────────────────────────────────────────────────────────
+
+    # Fields that should never be flashed back to the client
+    # (e.g., after a validation redirect).
+    _dont_flash: List[str] = ['password', 'password_confirmation']
+
+    # Mapping of exception type names to their appropriate log level.
+    # Used by report() to log at the correct severity.
+    _report_levels: Dict[str, str] = {
+        'ValidationException':     'warning',
+        'ModelNotFoundException':  'info',
+        'AuthenticationException': 'warning',
+        'AuthorizationException':  'warning',
+        'HttpException':           'warning',
+    }
+
+    def __init__(self, app: 'Application') -> None:
         self._app = app
-        self._dont_report = [
+        self._dont_report: List[Any] = [
             # Add exception classes that should not be logged
         ]
 
-    def register(self):
+    def register(self) -> None:
         """Register error handlers on the Flask app."""
         flask = self._app.get_flask()
 
@@ -70,7 +86,9 @@ class Handler:
         def handle_exception(e):
             return self._handle_exception(e)
 
-    def _handle_exception(self, e: Exception):
+    # ─── Exception Handling ───────────────────────────────────────────────────
+
+    def _handle_exception(self, e: Exception) -> Any:
         """Handle any unhandled exception."""
         from flask import jsonify, request, redirect, url_for
         from laraflask.core.exceptions import (
@@ -104,7 +122,7 @@ class Handler:
 
         return self._handle_server_error(e)
 
-    def _handle_server_error(self, e: Exception):
+    def _handle_server_error(self, e: Exception) -> Any:
         """Handle 500-level errors."""
         debug = self._app._flask.config.get('DEBUG', False)
 
@@ -114,12 +132,30 @@ class Handler:
         if debug:
             return self._debug_response(e)
 
-        return self._json_or_html(
-            {'message': 'Internal Server Error. We are working on it.'},
-            500
+        return self._build_error_response(
+            'Internal Server Error. We are working on it.', 500
         )
 
-    def _debug_response(self, e: Exception):
+    # ─── Response Builders ────────────────────────────────────────────────────
+
+    def _build_error_response(self, message: str, status: int) -> Any:
+        """
+        Build a standardised error response (JSON or HTML).
+
+        This is the single point for constructing error payloads, ensuring
+        consistent structure across all error handlers.
+
+        Args:
+            message: Human-readable error description.
+            status: HTTP status code.
+
+        Returns:
+            A tuple of (response, status_code).
+        """
+        return self._json_or_html({'message': message}, status)
+
+    def _debug_response(self, e: Exception) -> Any:
+        """Build a detailed debug response with traceback and request info."""
         from flask import jsonify, request, Response
         tb = traceback.format_exc()
         if request.is_json or request.path.startswith('/api/'):
@@ -127,6 +163,11 @@ class Handler:
                 'message':   str(e),
                 'exception': type(e).__name__,
                 'trace':     tb.splitlines(),
+                'request': {
+                    'method': request.method,
+                    'url':    request.url,
+                    'path':   request.path,
+                },
             }), 500
 
         html = f"""<!DOCTYPE html>
@@ -140,20 +181,32 @@ class Handler:
     .exc-type{{color:#94a3b8;font-size:.875rem;margin-bottom:1.5rem}}
     pre{{background:#1e1b4b;padding:1.25rem;border-radius:6px;font-size:.8125rem;overflow-x:auto;color:#a5b4fc;line-height:1.7}}
     .badge{{display:inline-block;background:#312e81;color:#a5b4fc;padding:.2rem .65rem;border-radius:20px;font-size:.75rem;margin-bottom:1rem}}
+    .req-info{{color:#94a3b8;font-size:.8rem;margin-top:1rem}}
   </style>
 </head>
 <body>
   <div class="err-box">
-    <span class="badge">⚠️ DEBUG MODE</span>
+    <span class="badge">DEBUG MODE</span>
     <h1>{type(e).__name__}: {str(e)}</h1>
     <p class="exc-type">An unhandled exception occurred</p>
     <pre>{tb}</pre>
+    <p class="req-info">{request.method} {request.path}</p>
   </div>
 </body>
 </html>"""
         return Response(html, status=500, mimetype='text/html')
 
-    def _json_or_html(self, data: dict, status: int):
+    def _json_or_html(self, data: Dict[str, Any], status: int) -> Any:
+        """
+        Return a JSON response based on client expectations.
+
+        Args:
+            data: Response payload dict.
+            status: HTTP status code.
+
+        Returns:
+            Tuple of (response, status_code).
+        """
         from flask import jsonify, request
         if (request.is_json
                 or request.path.startswith('/api/')
@@ -161,18 +214,38 @@ class Handler:
             return jsonify({'success': False, **data}), status
         return jsonify({'success': False, **data}), status
 
-    def report(self, e: Exception):
-        """Log the exception."""
-        logger.error(
-            f"Exception [{type(e).__name__}]: {e}\n{traceback.format_exc()}"
-        )
+    # ─── Reporting ────────────────────────────────────────────────────────────
+
+    def report(self, e: Exception) -> None:
+        """
+        Log the exception at the appropriate severity level.
+
+        Uses ``_report_levels`` to determine the log level based on exception
+        type. Falls back to ``error`` for unknown exception types.
+        """
+        exc_name = type(e).__name__
+        level = self._report_levels.get(exc_name, 'error')
+        log_message = f"Exception [{exc_name}]: {e}\n{traceback.format_exc()}"
+
+        log_method = getattr(logger, level, logger.error)
+        log_method(log_message)
 
     def _should_skip_report(self, e: Exception) -> bool:
+        """Check whether the exception is in the don't-report list."""
         for exc_type in self._dont_report:
             if isinstance(e, exc_type):
                 return True
         return False
 
-    def dont_report(self, *exception_classes) -> 'Handler':
+    def dont_report(self, *exception_classes: Any) -> 'Handler':
+        """
+        Register exception classes that should not be reported.
+
+        Args:
+            *exception_classes: Exception types to suppress from logging.
+
+        Returns:
+            Self for method chaining.
+        """
         self._dont_report.extend(exception_classes)
         return self
