@@ -15,9 +15,9 @@ config = {
 
     'providers': [
         # Application Service Providers
-        # 'app.Providers.AppServiceProvider.AppServiceProvider',
-        # 'app.Providers.AuthServiceProvider.AuthServiceProvider',
-        # 'app.Providers.EventServiceProvider.EventServiceProvider',
+        'app.Providers.AppServiceProvider.AppServiceProvider',
+        'app.Providers.AuthServiceProvider.AuthServiceProvider',
+        'app.Providers.EventServiceProvider.EventServiceProvider',
         # 'app.Providers.RouteServiceProvider.RouteServiceProvider',
     ],
 

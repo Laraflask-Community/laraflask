@@ -2,16 +2,26 @@
 User Model
 """
 
+from __future__ import annotations
+
+__all__ = ['User']
+
 import laraflask
 from laraflask.orm.model import Model
 from laraflask.auth.auth import Hash
 from laraflask.notifications.notification import Notifiable
+from app.Models.Concerns.HasRoles import HasRoles
 
 
-class User(Model, Notifiable):
+class User(Model, Notifiable, HasRoles):
     """
-    User model — the default authentication model.
+    User model -- the default authentication model.
+
+    Inherits role-management helpers from HasRoles and notification
+    support from Notifiable.
     """
+
+    # ─── Table & Mass-Assignment ──────────────────────────────────────────────
 
     __table__    = 'users'
     __fillable__ = ['name', 'email', 'password']
@@ -52,21 +62,39 @@ class User(Model, Notifiable):
     #     from app.Models.Profile import Profile
     #     return self.has_one(Profile)
 
+    # ─── Query Scopes ─────────────────────────────────────────────────────────
+    # Uncomment and implement when the ORM supports scope methods.
+
+    # @classmethod
+    # def admins(cls):
+    #     """Scope: only users with the admin role."""
+    #     return cls.where('role', cls.ROLE_ADMIN)
+
+    # @classmethod
+    # def verified(cls):
+    #     """Scope: only users who have verified their email."""
+    #     return cls.where_not_null('email_verified_at')
+
+    # @classmethod
+    # def active(cls):
+    #     """Scope: only active (non-banned) users."""
+    #     return cls.where('is_active', True)
+
     # ─── Custom Methods ───────────────────────────────────────────────────────
 
-    def is_admin(self) -> bool:
-        return self._attributes.get('role') == 'admin'
-
     def has_verified_email(self) -> bool:
+        """Check whether the user has verified their email address."""
         return self._attributes.get('email_verified_at') is not None
 
     @classmethod
     def find_by_email(cls, email: str):
+        """Find a user by their email address."""
         return cls.where('email', email).first()
 
     def generate_api_key(self) -> str:
+        """Generate and persist a new API key for the user."""
         import secrets
-        key = secrets.token_hex(40)
+        key: str = secrets.token_hex(40)
         self._attributes['api_key'] = key
         self.save()
         return key

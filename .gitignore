@@ -49,3 +49,6 @@ Thumbs.db
 # Test artifacts
 .coverage
 htmlcov/
+
+# Agent task files
+.agents/
