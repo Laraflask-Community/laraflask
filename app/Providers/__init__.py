@@ -10,9 +10,11 @@ during the application boot sequence.
 from app.Providers.AppServiceProvider import AppServiceProvider
 from app.Providers.AuthServiceProvider import AuthServiceProvider
 from app.Providers.EventServiceProvider import EventServiceProvider
+from app.Providers.RouteServiceProvider import RouteServiceProvider
 
 __all__ = [
     "AppServiceProvider",
     "AuthServiceProvider",
     "EventServiceProvider",
+    "RouteServiceProvider",
 ]
