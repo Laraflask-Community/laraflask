@@ -174,7 +174,7 @@ class UserFactory(Factory):
 
     def state_verified(self) -> Dict:
         import datetime
-        return {'email_verified_at': datetime.datetime.utcnow().isoformat()}
+        return {'email_verified_at': datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()}
 
     def state_unverified(self) -> Dict:
         return {'email_verified_at': None}

@@ -218,13 +218,13 @@
 
     <!-- Flash Messages -->
     <div class="container" style="margin-top:1rem">
-        @if session.get('success')
+        @if(session.get('success'))
         <div class="alert alert-success">{{ session.pop('success') }}</div>
         @endif
-        @if session.get('error')
+        @if(session.get('error'))
         <div class="alert alert-error">{{ session.pop('error') }}</div>
         @endif
-        @if session.get('warning')
+        @if(session.get('warning'))
         <div class="alert alert-warning">{{ session.pop('warning') }}</div>
         @endif
     </div>

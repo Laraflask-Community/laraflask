@@ -352,7 +352,7 @@ class ModelSoftDeleteTest(UnitTestCase):
 
         # Directly test the soft-delete attribute-setting logic
         Article.__soft_delete__ = True
-        article._attributes['deleted_at'] = datetime.datetime.utcnow()
+        article._attributes['deleted_at'] = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         self.assertIn('deleted_at', article._attributes)
         self.assertIsInstance(article._attributes['deleted_at'], datetime.datetime)
 
@@ -364,7 +364,7 @@ class ModelSoftDeleteTest(UnitTestCase):
             __soft_delete__ = True
 
         article = Article.__new__(Article)
-        article._attributes = {'id': 1, 'deleted_at': datetime.datetime.utcnow()}
+        article._attributes = {'id': 1, 'deleted_at': datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)}
         article._exists = True
         article._dirty = {}
         article._relations = {}

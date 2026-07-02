@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, call
 from laraflask.testing.test_case import UnitTestCase
 from laraflask.events.dispatcher import EventDispatcher, Event, Listener, EventSubscriber
 from laraflask.queue.queue import Job, SyncDriver, DatabaseDriver, QueueMessage, Worker
-from laraflask.scheduler.schedule import Schedule, Event as ScheduledEvent
+from laraflask.scheduler.schedule import Schedule, ScheduledEvent
 
 
 # ─────────────────────────────────────────────────────────────────────────────

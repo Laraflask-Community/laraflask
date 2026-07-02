@@ -7,16 +7,24 @@ or laraflask.routing.router here. Use `Route` directly for all routing,
 and `ApiResponse` (or `self.respond()` inside controllers) for responses.
 """
 
-from laraflask.api.api import ApiResponse
-
 # ─── Welcome ──────────────────────────────────────────────────────────────────
 
-Route.get('/', lambda: ApiResponse.success(data={
-    'framework': 'Laraflask',
-    'version':   '1.3.0',
-    'tagline':   'Elegant · Expressive · Modern · Fast · Scalable',
-    'status':    'running',
-})).name('welcome')
+Route.view('/', 'welcome', {
+    'features': [
+        {'icon': '🚀', 'title': 'Eloquent-style ORM', 'desc': 'Active Record models on top of SQLAlchemy.', 'color': '#6366f1'},
+        {'icon': '🛠️', 'title': 'Artisan CLI', 'desc': 'Generators, migrations, queue workers, and Tinker.', 'color': '#22c55e'},
+        {'icon': '🧩', 'title': 'Service Container', 'desc': 'Dependency injection with contextual binding & tagging.', 'color': '#f59e0b'},
+        {'icon': '🧱', 'title': 'BladePy Templates', 'desc': 'Blade-like directives compiled down to Jinja2.', 'color': '#ec4899'},
+        {'icon': '📨', 'title': 'Queue & Jobs', 'desc': 'Background jobs with graceful, interruptible workers.', 'color': '#0ea5e9'},
+        {'icon': '🧪', 'title': 'Testing Toolkit', 'desc': 'Unit/feature tests with fakes for events, mail, and queues.', 'color': '#8b5cf6'},
+    ],
+    'stats': [
+        {'value': '20+', 'label': 'Modules'},
+        {'value': '100%', 'label': 'Python'},
+        {'value': 'MIT', 'label': 'Licensed'},
+        {'value': 'v1.4.0', 'label': 'Latest'},
+    ],
+})
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────

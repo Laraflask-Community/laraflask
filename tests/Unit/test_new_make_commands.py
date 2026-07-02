@@ -27,16 +27,98 @@ from laraflask.events.dispatcher import Events, ModelCreated
 
 
 class GeneratorCommandTestBase(UnitTestCase):
-    """Runs every generator command test inside a clean temp directory."""
+    """
+    Runs every generator command test inside a clean temp directory.
+
+    [ID] BUG LAMA yang diperbaiki — dua lapis masalah:
+    1. `sys.path` Python selalu memuat entry `''` (string kosong) di
+       posisi awal, yang merujuk ke direktori kerja proses SAAT
+       INTERPRETER DIMULAI — bukan cwd yang berubah-ubah setelah
+       `os.chdir()`.
+    2. Yang lebih halus: entry RELATIF lain di `sys.path` (mis.
+       `'tests/Unit/../..'`, yang dimasukkan oleh baris
+       `sys.path.insert(0, ...)` di awal file test ini) di-cache oleh
+       Python sebagai `FileFinder` dengan path ABSOLUT di
+       `sys.path_importer_cache` pada saat **pertama kali dipakai** —
+       yaitu sebelum `os.chdir()` ke tmp dir terjadi. Setelah cache itu
+       terbentuk, `os.chdir()` tidak lagi berpengaruh: Python tetap
+       memakai `FileFinder` lama yang menunjuk ke folder project asli.
+
+    Akibatnya, `import_module('app.Requests.X')` di dalam tmp dir tetap
+    menemukan package `app` dari project asli, bukan dari tmp dir yang
+    baru dibuat — menyebabkan `ModuleNotFoundError` untuk submodule yang
+    baru di-generate. Diperbaiki dengan: (a) menghapus seluruh entry
+    RELATIF dari `sys.path` (bukan hanya `''`), dan (b) membersihkan
+    `sys.path_importer_cache` setiap kali, supaya Python terpaksa
+    me-resolve ulang `FileFinder` dari cwd yang benar.
+
+    [EN] OLD BUG fixed here — two layers of the issue:
+    1. Python's `sys.path` always contains an `''` (empty string) entry
+       at the start, which refers to the process's working directory AT
+       INTERPRETER STARTUP — not the cwd as it changes after
+       `os.chdir()`.
+    2. More subtly: other RELATIVE entries in `sys.path` (e.g.
+       `'tests/Unit/../..'`, inserted by this test file's own
+       `sys.path.insert(0, ...)` line) get cached by Python as a
+       `FileFinder` with an ABSOLUTE path in
+       `sys.path_importer_cache` the **first time they're used** — i.e.
+       before `os.chdir()` to the temp dir happens. Once that cache
+       exists, `os.chdir()` no longer matters: Python keeps using the old
+       `FileFinder` pointing at the original project folder.
+
+    As a result, `import_module('app.Requests.X')` inside the temp dir
+    still found the `app` package from the original project, instead of
+    the freshly-created temp dir — causing a `ModuleNotFoundError` for
+    the newly-generated submodule. Fixed by: (a) removing every RELATIVE
+    entry from `sys.path` (not just `''`), and (b) clearing
+    `sys.path_importer_cache` each time, forcing Python to re-resolve the
+    `FileFinder` from the correct cwd.
+    """
 
     def before_each(self):
         self._original_cwd = os.getcwd()
         self._tmp_dir = tempfile.mkdtemp()
+
+        # [ID] Path yang harus disingkirkan mungkin sudah absolut tapi
+        # BELUM ter-normalisasi (mis. mengandung literal `..`, seperti
+        # `/project/tests/Unit/../..`) — jadi tidak cukup difilter dengan
+        # `os.path.isabs()`. Bandingkan versi ter-normalisasi terhadap
+        # root project asli.
+        # [EN] The path that needs removing may already be absolute but
+        # NOT normalized (e.g. contains a literal `..`, like
+        # `/project/tests/Unit/../..`) — so filtering with
+        # `os.path.isabs()` alone isn't enough. Compare the normalized
+        # version against the original project root instead.
+        self._removed_path_entries = [
+            p for p in sys.path
+            if not p or os.path.normpath(p or '.') == os.path.normpath(self._original_cwd)
+        ]
+        for entry in self._removed_path_entries:
+            sys.path.remove(entry)
+        sys.path_importer_cache.clear()
+
         os.chdir(self._tmp_dir)
+        self._purge_cached_packages()
 
     def after_each(self):
         os.chdir(self._original_cwd)
         shutil.rmtree(self._tmp_dir, ignore_errors=True)
+
+        for entry in self._removed_path_entries:
+            if entry not in sys.path:
+                sys.path.insert(0, entry)
+        sys.path_importer_cache.clear()
+
+        self._purge_cached_packages()
+
+    @staticmethod
+    def _purge_cached_packages():
+        purged = []
+        for name in list(sys.modules):
+            if name == 'app' or name.startswith('app.') or name == 'database' or name.startswith('database.'):
+                del sys.modules[name]
+                purged.append(name)
+        return purged
 
 
 class MakeRequestCommandTest(GeneratorCommandTestBase):

@@ -1,4 +1,4 @@
-# Laraflask v1.4.0
+# Laraflask v1.5.0
 
 **A Laravel-inspired framework for Python — built on top of Flask + SQLAlchemy.**
 Elegant. Expressive. Modern.
@@ -2467,7 +2467,31 @@ gunicorn -w 4 -k gevent -b 0.0.0.0:8000 laraflask:flask_app
 
 ## Changelog
 
-### v1.4.0 (latest)
+### v1.5.0 (latest) — Critical Fixes: Templates, Routing, Security
+
+This release fixes a set of bugs discovered during a full audit of the codebase, several of which prevented the framework from working at all out of the box, and one of which was a real security vulnerability. If you're running v1.4.0 or earlier, **upgrading is strongly recommended**.
+
+| # | Severity | Area | File(s) | Fix |
+|---|---|---|---|---|
+| 1 | 🔴 Critical | Template rendering | `template/blade.py`, `core/application.py` | BladePy was fully written but **never actually wired into Flask** — `render_template()`/`Route.view()` used Flask's stock Jinja2 loader, which can't resolve dot-notation template names or compile any `@directive`. This made every `.blade.html` view fail with `TemplateNotFound` or raw uncompiled directive text. Added a custom Jinja2 loader and wired it into `Application._configure_blade()`. |
+| 2 | 🔴 Critical | Routing | `core/application.py` | `_load_routes()` was only called from `Application.run()`, so `routes/web.py`/`routes/api.py` were never loaded when deploying via Gunicorn/uWSGI or calling `get_flask()` directly (e.g. `route:list` always showed an empty table). Moved into `bootstrap()`, with an idempotency guard. |
+| 3 | 🔴 Critical | Template engine | `template/blade.py` | `@if`, `@foreach`, `@unless`, `@for`, `@forelse` all broke whenever the expression inside the parentheses contained a nested function/method call (e.g. `@if(session.get('success'))`, extremely common) — the old regex matched the *first* closing `)`, not the balanced one. Replaced with a proper balanced-parenthesis parser. |
+| 4 | 🟠 High | Template engine | `template/blade.py` | `@section('name', 'inline value')` (2-argument form) and `@yield('name', config(...))` (non-string-literal default) both broke compilation; `@while` compiled to `{% while %}`, which doesn't exist in Jinja2 and would always fail. All three fixed. |
+| 5 | 🟠 High | Security | `middleware/middleware.py` | `VerifySignedMiddleware` extracted the `signature` query parameter but **never actually verified it** — only checked `expires`. Anyone could forge a signed URL with a valid expiry and an arbitrary signature and it would pass. Now properly delegates to `SignedUrl.verify()` (HMAC + timing-safe comparison). |
+| 6 | 🟠 High | Security | `console/artisan.py` | `key:generate` produced a **hex** string but labeled it `base64:`. `Crypt` takes that label at face value and calls `base64.b64decode()` on it — since hex digits are also valid base64 characters, this **silently succeeded with the wrong bytes** (48 garbage bytes instead of the intended 32-byte key), so the effective AES key never matched what was generated/displayed. Now generates genuine base64-encoded random bytes. |
+| 7 | 🟡 Medium | Config helper | `template/blade.py`, `core/application.py` | The `config()` template helper always returned the default value and never read real config. Fixed via a new `Flask.laraflask_app` back-reference. |
+| 8 | 🟡 Medium | Artisan CLI | `console/artisan.py` | `make:controller --api` accepted the flag but never used it — generated controllers always included `create()`/`edit()` (HTML-form methods). Fixed to properly omit them, matching Laravel's convention. |
+| 9 | 🟡 Medium | Artisan CLI | `console/artisan.py`, `queue/queue.py` | `queue:work --tries=N` accepted the flag but silently discarded it. Now used as the fallback max-retry count when a job doesn't define its own `tries` (per-job values still take priority). |
+| 10 | 🟡 Medium | Version consistency | `__init__.py`, `console/artisan.py`, `setup.py`, `pyproject.toml` | The version string had drifted out of sync across 4 different locations (`__init__.py` said 1.3.0, one CLI banner said 1.0.0, another said 1.4.0). Consolidated to a single source of truth (`laraflask.__version__`) that the CLI banners now read from, instead of separately hardcoding it. |
+| 11 | 🟢 Low | Correctness | `scheduler/schedule.py`, `core/container.py` | Two leftover `NameError`-in-waiting bugs from an earlier incomplete rename/refactor: `List[Event]` (should be `List[ScheduledEvent]`) in 3 places, and a missing `List` import. Both silent until something forced eager type-hint evaluation. |
+| 12 | 🟢 Low | Environment loading | `core/application.py`, `.env`, `.env.example` | The bundled `.env` used non-ASCII box-drawing characters (`─`) in comments, a likely cause of `python-dotenv` parse warnings on some systems (e.g. Termux/Android). Replaced with plain ASCII, and `load_dotenv()` now explicitly passes `encoding='utf-8'` with a clear diagnostic on failure instead of a silent/obscure one. |
+| 13 | 🟢 Low | Starter content | `resources/views/welcome.blade.html`, `resources/views/layouts/app.blade.html`, `routes/web.py` | The bundled starter template itself had 5 directive syntax errors (missing parentheses) and referenced `features`/`stats` data that `routes/web.py` never actually supplied — so the default homepage never rendered even after the engine bugs above were fixed. |
+| 14 | 🟢 Low | Test suite | `tests/Unit/test_new_make_commands.py`, `tests/Unit/test_events_queue_scheduler.py` | Fixed a `sys.path`/import-cache isolation bug that made 8 generator-command tests fail depending on run order, and a leftover `Event`/`ScheduledEvent` import mismatch from the same rename mentioned in #11. The full suite is now 472/472 passing. |
+| 15 | 🟢 Low | Deprecation | `orm/model.py`, `orm/migration.py`, `auth/auth.py`, `notifications/notification.py` | Replaced all 6 uses of `datetime.datetime.utcnow()` (deprecated, scheduled for removal) with `datetime.now(timezone.utc).replace(tzinfo=None)` — numerically identical, and compatible with the project's Python 3.10 minimum (unlike `datetime.UTC`, which needs 3.11+). |
+
+**Verification**: every fix above was reproduced first, then verified with a targeted test after the fix (not just "it compiles") — including a forged-signature rejection test, a round-trip encrypt/decrypt test with the corrected key format, and both `--api`/`--tries` behavior checks. The full test suite (472 tests) passes with `-W error::DeprecationWarning`, meaning zero deprecated API usage remains anywhere in the codebase.
+
+### v1.4.0
 
 | # | Area | File(s) | Change |
 |---|---|---|---|
